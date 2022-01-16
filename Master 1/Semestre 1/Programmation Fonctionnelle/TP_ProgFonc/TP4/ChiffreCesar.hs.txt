@@ -1,0 +1,48 @@
+import Data.Char
+
+-- chiffrement
+
+let2int :: Char -> Int
+let2int c = ord c - ord 'A'
+
+int2let :: Int -> Char
+int2let n = chr (n + ord 'A')
+
+shift :: Int -> Char -> Char
+shift n c | isLower c = shift n (toUpper c)
+          | otherwise = int2let ((let2int c + n ) `mod` 26) 
+
+cypher :: Int -> String -> String
+cypher n m = [ shift n c | c <- m, isAlpha c]
+
+-- décryptage
+
+table :: [Float]
+table = [9.42, 1.02, 2.64, 3.39, 15.87, 0.95, 1.04, 0.77, 8.41, 0.89, 0.001,
+         5.34, 3.24, 7.15, 5.14, 2.86, 1.06, 6.46, 7.90, 7.26, 6.24, 2.15,
+         0.001, 0.30, 0.24, 0.32]
+
+percent :: Int -> Int -> Float
+percent n m = (fromIntegral n / fromIntegral m) * 100
+
+count :: Char -> String -> Int
+count c cs = length [ c' | c' <- cs, c == c']
+
+freqs :: String -> [Float]
+freqs xs = let l <- length xs in [percent (count c xs) l | c <- ['A'..'Z']]
+
+chisqr :: [Float] -> [Float] -> Float
+chisqr os es = sum [ ((o - e)^2) / e | (o, e) <- zip os es]
+
+rotate :: Int -> [a] -> [a]
+rotate n xs = drop n xs ++ take n xs
+
+positions :: Eq a => a -> [a] -> [Int]
+positions x xs = [ i | (x', i) <- zip xs [0..], x == x']
+
+crack :: String -> String
+crack xs = cypher (-factor) xs
+    where factor = head (positions (minimum chitab) chitab)
+          chitab = [chisqr (rotate n table') table | n <- [0..25]]
+          table' = freqs xs
+

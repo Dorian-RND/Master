@@ -1,0 +1,112 @@
+import Data.Char
+import Data.List
+import System.IO
+
+size :: Int
+size = 3 -- On fixe ici globalement la taille de la grille
+
+data Player = O | X | B
+    deriving (Eq, Ord)
+
+instance Show Player where
+    show O = " O "
+    show X = " X "
+    show B = "   "
+
+type Grid = [[Player]] -- La grille est une liste de lignes
+
+next :: Player -> Player
+next O = X
+next X = O
+next B = B
+
+empty :: Grid
+empty = replicate size (replicate size B)
+
+full :: Grid -> Bool
+full xs = all (/= B) (concat xs)
+
+diag :: Grid -> [Player]
+diag g = [g !! n !! n | n <- [0..size-1]]
+
+wins :: Player -> Grid -> Bool
+wins p g = any line (rows ++ cols ++ diags)
+    where line = all (== p)
+          rows = g
+          cols = transpose g
+          diags = [diag g, diag (map reverse g)]
+
+won :: Grid -> Bool
+won g = wins X g || wins O g
+
+insVert :: [String] -> [String]
+insVert [x] = [x]
+insVert (x:xs) = x : "|" : xs  
+
+showRow :: [Player] -> [String]
+showRow [] = []
+showRow (x:xs) = insVert (show x : showRow xs)
+
+insHoriz :: [String]
+insHoriz = replicate size "---" ++ replicate (size-1) "-"
+
+showGrid :: Grid -> IO ()
+showGrid [] = return ()
+showGrid [x] = putStrLn (concat (showRow x))
+showGrid (x:xs) = do putStrLn (concat (showRow x))
+                     putStrLn (concat (insHoriz))
+                     showGrid xs
+
+valid :: Grid -> Int -> Bool
+valid g p = p < size^2 && p >= 0 && concat g !! p == B
+
+cut :: Int -> [a] -> [[a]]
+cut _ [] = []
+cut n xs = take n xs : cut n (drop n xs) 
+
+move :: Grid -> Int -> Player -> [Grid]
+move g c p = if valid g c
+               then [cut size (ls ++ [p] ++ rs)]
+               else []
+            where ps = concat g
+                  ls = take c ps
+                  (B:rs) = drop c ps
+
+cls :: IO ()
+cls = putStr "\ESC[2J"
+
+goto :: (Int, Int) -> IO ()
+goto (x,y) = putStr ("\ESC[" ++ show y ++ ";" ++ show x ++ "H")
+
+run :: Grid -> Player -> IO ()
+run g p = do cls            -- clear screen
+             goto (1,1)     -- go to the upper left position
+             showGrid g
+             run' g p
+
+getNat :: String -> IO Int
+getNat message =
+    do putStr message
+       xs <- getLine
+       if xs /= [] && all isDigit xs
+          then return (read xs)
+          else do putStrLn "Error: invalid number"
+                  getNat message
+
+tictactoe :: IO ()
+tictactoe = run empty O
+
+prompt :: Player -> String
+prompt p = "Player " ++ show p ++ ", enter your move: "
+
+run' :: Grid -> Player -> IO ()
+run' g p | wins O g  = putStrLn "Player O wins!\n"
+         | wins X g  = putStrLn "Player X wins!\n"
+         | full g    = putStrLn "It's a draw!\n"
+         | otherwise =
+            do i <- getNat (prompt p)
+               case move g i p of
+                [] -> do putStrLn "Error: invalid move"
+                         run' g p
+                [g'] -> run g' (next p)
+
